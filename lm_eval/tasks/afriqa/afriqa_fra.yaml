@@ -1,7 +1,7 @@
 task: afriqa_fra
 group:
   - afriqa
-dataset_path: /Users/aszab/EDU/UCL/year4/modules/FYP/code/external/afriqa-gold-passages
+dataset_path: ./external/afriqa-gold-passages
 dataset_name: fon # the dataset configuration to use. Leave `null` if your dataset does not require a config to be passed. See https://huggingface.co/docs/datasets/load_hub#configurations for more info.
 dataset_kwargs: null # any extra keyword arguments that should be passed to the dataset constructor, e.g. `data_dir`.
 test_split: test
