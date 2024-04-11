@@ -1,0 +1,20 @@
+task: afriqa_ibo
+group:
+  - afriqa
+dataset_path: /Users/aszab/EDU/UCL/year4/modules/FYP/code/external/afriqa-gold-passages
+dataset_name: ibo # the dataset configuration to use. Leave `null` if your dataset does not require a config to be passed. See https://huggingface.co/docs/datasets/load_hub#configurations for more info.
+dataset_kwargs: null # any extra keyword arguments that should be passed to the dataset constructor, e.g. `data_dir`.
+test_split: test
+doc_to_text: "Use the following pieces of context to answer the provided question. If you don't know the answer, just say that you don't know, don't try to make up an answer. Provide the
+answer with the least number of words possible. Provide the answer only. Provide answer in English. Do not repeat the question.\n\nContext: {{context}}\nQuestion: {{question_lang}}\nAnswer:"
+doc_to_target: "{{answer_pivot}}"
+process_results: !function utils.process_results
+metric_list:
+  - metric: em
+    aggregation: mean
+    higher_is_better: true
+  - metric: f1
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0
