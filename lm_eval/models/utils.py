@@ -570,9 +570,11 @@ class Collator:
                     hashable_dict = tuple(
                         (
                             key,
-                            tuple(value)
-                            if isinstance(value, collections.abc.Iterable)
-                            else value,
+                            (
+                                tuple(value)
+                                if isinstance(value, collections.abc.Iterable)
+                                else value
+                            ),
                         )
                         for key, value in sorted(fn(ob).items())
                     )
@@ -727,3 +729,56 @@ def handle_stop_sequences(
     if eos is not None and eos not in until:
         until.append(eos)
     return until
+
+
+def remove_random_tokens(token_ids: list[int], num_to_replace: int) -> list[int]:
+    token_ids = torch.tensor(token_ids)
+    idx_to_remove = torch.randperm(len(token_ids))[
+        : min(num_to_replace, len(token_ids))
+    ].tolist()
+
+    mask = torch.ones(len(token_ids))
+    mask[idx_to_remove] = False
+    return token_ids[mask.bool()].tolist()
+
+
+def remove_removable_tokens(token_ids: list[int], num_to_replace: int) -> list[int]:
+    token_ids = torch.tensor(token_ids)
+    removable_token_ids = [
+        (13, "."),
+        (11, ","),
+        # (279, " the"),
+        # (323, " and"),
+        # (220, " "),
+        # (315, " of"),
+        # (304, " in"),
+        # (311, " to"),
+        # (578, " The"),
+        # (574, " was"),
+        # (505, " from"),
+        # (555, " by"),
+        # (369, " for"),
+        # (320, " ("),
+        # (449, " with"),
+        # (264, " a"),
+    ]
+
+    removable_idx = []
+    for i, token_id in enumerate(token_ids):
+        for removable_token_id, _ in removable_token_ids:
+            if token_id == removable_token_id:
+                removable_idx.append(i)
+
+    # if num_to_replace is -1, remove all removable tokens
+    if num_to_replace == -1:
+        idx_to_remove = torch.tensor(removable_idx).tolist()
+    else:
+        idx_to_remove = torch.tensor(removable_idx)[
+            torch.randperm(len(removable_idx))[
+                : min(num_to_replace, len(removable_idx))
+            ]
+        ].tolist()
+
+    mask = torch.ones(len(token_ids))
+    mask[idx_to_remove] = False
+    return token_ids[mask.bool()].tolist()

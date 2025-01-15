@@ -36,6 +36,8 @@ from lm_eval.models.utils import (
     handle_stop_sequences,
     pad_and_concat,
     stop_sequences_criteria,
+    remove_random_tokens,
+    remove_removable_tokens,
 )
 
 
@@ -99,7 +101,9 @@ class HFLM(TemplateLM):
             eval_logger.warning(
                 "`pretrained` model kwarg is not of type `str`. Many other model arguments may be ignored. Please do not launch via accelerate or use `parallelize=True` if passing an existing model this way."
             )
-            assert not parallelize, "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
+            assert (
+                not parallelize
+            ), "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
             self._model = pretrained
             self._device = self._model.device
             self._config = self._model.config
@@ -608,9 +612,9 @@ class HFLM(TemplateLM):
                     pretrained,
                     trust_remote_code=trust_remote_code,
                     model_basename=None if autogptq is True else Path(autogptq).stem,
-                    use_safetensors=True
-                    if autogptq is True
-                    else autogptq.endswith(".safetensors"),
+                    use_safetensors=(
+                        True if autogptq is True else autogptq.endswith(".safetensors")
+                    ),
                     **model_kwargs,
                 )
 
@@ -757,7 +761,9 @@ class HFLM(TemplateLM):
                     (batch_size, max_length), device=self.device
                 ).long()
             for _ in range(5):
-                out = F.log_softmax(self._model_call(test_batch, **call_kwargs), dim=-1)  # noqa: F841
+                out = F.log_softmax(
+                    self._model_call(test_batch, **call_kwargs), dim=-1
+                )  # noqa: F841
 
             return batch_size
 
@@ -806,7 +812,15 @@ class HFLM(TemplateLM):
         if left_truncate_len:
             encoding = encoding[-left_truncate_len:]
 
-        return encoding
+        post_encoding = remove_removable_tokens(encoding, 10)
+        # removed_tokens_count = len(encoding) - len(post_encoding)
+        # print(f"removed: {removed_tokens_count} tokens")
+        # post_encoding = remove_random_tokens(encoding, removed_tokens_count)
+
+        # remove the initial bos token
+        # post_encoding = encoding[1:]
+
+        return post_encoding
 
     def tok_batch_encode(
         self,
@@ -1056,9 +1070,9 @@ class HFLM(TemplateLM):
         re_ord = Collator(
             requests,
             sort_fn=_collate,
-            group_by="contexts"
-            if self.backend == "causal" and self.logits_cache
-            else None,
+            group_by=(
+                "contexts" if self.backend == "causal" and self.logits_cache else None
+            ),
             group_fn=_lookup_one_token_cont,
         )
 
@@ -1068,9 +1082,7 @@ class HFLM(TemplateLM):
         batch_size = (
             self.batch_size
             if self.batch_size != "auto"
-            else override_bs
-            if override_bs is not None
-            else 0
+            else override_bs if override_bs is not None else 0
         )
         batch_fn = (
             self._batch_scheduler
@@ -1225,7 +1237,9 @@ class HFLM(TemplateLM):
                 ):
                     cont_toks = torch.tensor(
                         cont_toks, dtype=torch.long, device=self.device
-                    ).unsqueeze(0)  # [1, seq]
+                    ).unsqueeze(
+                        0
+                    )  # [1, seq]
                     max_equal = (greedy_tokens == cont_toks).all()
 
                     # Obtain log-probs at the corresponding continuation token indices
@@ -1284,9 +1298,7 @@ class HFLM(TemplateLM):
         batch_size = (
             self.batch_size
             if self.batch_size != "auto"
-            else adaptive_batch_size
-            if adaptive_batch_size is not None
-            else 0
+            else adaptive_batch_size if adaptive_batch_size is not None else 0
         )
         batch_fn = (
             self._batch_scheduler
